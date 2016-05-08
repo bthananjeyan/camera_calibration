@@ -112,8 +112,10 @@ class ChessDetector:
         print "processing image"
         left_gray = cv2.cvtColor(self.left_image,cv2.COLOR_BGR2GRAY)
         right_gray = cv2.cvtColor(self.right_image,cv2.COLOR_BGR2GRAY)
-        ret, left_corners = cv2.findChessboardCorners(left_gray, (8,6), None)
-        ret, right_corners = cv2.findChessboardCorners(right_gray, (8,6), None)
+        ret, left_corners = cv2.findChessboardCorners(left_gray, (6,5), None)
+        ret, right_corners = cv2.findChessboardCorners(right_gray, (6,5), None)
+        print left_corners
+        print right_corners
         print len(left_corners), len(right_corners)
         left, right, = [], []
         for i in range(len(left_corners)):

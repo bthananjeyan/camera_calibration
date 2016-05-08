@@ -4,9 +4,12 @@ robot class, this can be done by `import robot` an well as initialize
 the robot. For example, if we want to create a robot called `r`, for
 robot `PSM1`, we will simply type `r = robot.robot('PSM1')` in iPython
 and `r = robot('PSM1')` in python.
+
 .. _interpolate:
+
 Interpolation
 =============
+
 If the `interpolation` flag is set to `True` (default), the robot
 controller will use a `trajectory generator
 <http://ttuadvancedrobotics.wikidot.com/trajectory-planning-for-point-to-point-motion>`_
@@ -14,18 +17,23 @@ to create set points between the current position and the position
 requested by the user.  If your desired position is "far" from the
 current position, you should always set the `interpolate` flag to
 `True`.
+
 The only case where you should override the default and set
 `interpolate` to `False` is if you are sending positions close to each
 other.  For example, when `tele-operating
 <https://en.wikipedia.org/wiki/Teleoperation>`_, all the master
 positions you will receive will define a continuous trajectory with
 positions close to each other.
+
 It is important to note that when `interpolate` is set to `False`,
 sending a new goal that is far from the last desired position will
 likely trigger a `PID tracking error <https://en.wikipedia.org/wiki/PID_controller>`_.
+
 .. _currentvdesired:
+
 Current vs Desired position
 ===========================
+
 The robot controller can provide two different positions at any given
 time.  The current position is the position measured by the sensors
 (in most cases, encoders).  This position defines the physical
@@ -37,13 +45,16 @@ When using a `trajectory
 <http://ttuadvancedrobotics.wikidot.com/trajectory-planning-for-point-to-point-motion>`_,
 the desired position is not the final goal but the last set point
 generated for the trajectory.
+
 Desired positions might differ from the physical positions due to
 `forces (gravity, friction, ...) <https://en.wikipedia.org/wiki/Force>`_ applied on the robot.  When
 implementing an incremental move, one should always use the last
 desired position.  If one needs to track the robot, it is better to
 use the current position.
+
 Robot API
 =========
+
 """
 
 # sphinx-apidoc -F -A "Yijun Hu" -o doc src
@@ -56,9 +67,9 @@ import logging
 import time
 import inspect
 import code
+import IPython
 import math
 import numpy as np
-import tfx
 
 from PyKDL import *
 from tf import transformations
@@ -69,6 +80,7 @@ from geometry_msgs.msg import Vector3
 from geometry_msgs.msg import Quaternion
 from sensor_msgs.msg import JointState
 from math import pi
+# from poseInterpolator import linear_pose_interp, quat2euler
 
 from code import InteractiveConsole
 from imp import new_module
@@ -152,6 +164,7 @@ class robot:
 
     def __robot_state_callback(self, data):
         """Callback for robot state.
+
         :param data: the current robot state"""
         rospy.loginfo(rospy.get_caller_id() + " -> current state is %s", data.data)
         self.__robot_state = data.data
@@ -159,6 +172,7 @@ class robot:
 
     def __goal_reached_callback(self, data):
         """Callback for the goal reached.
+
         :param data: the goal reached"""
         rospy.loginfo(rospy.get_caller_id() + " -> goal reached is %s", data.data)
         self.__goal_reached = data.data
@@ -166,17 +180,20 @@ class robot:
 
     def __state_joint_desired_callback(self, data):
         """Callback for the joint desired position.
+
         :param data: the `JointState <http://docs.ros.org/api/sensor_msgs/html/msg/JointState.html>`_desired"""
         self.__position_joint_desired[:] = data.position
         self.__effort_joint_desired[:] = data.effort
 
     def __position_cartesian_desired_callback(self, data):
         """Callback for the cartesian desired position.
+
         :param data: the cartesian position desired"""
         self.__position_cartesian_desired = posemath.fromMsg(data)
 
     def __state_joint_current_callback(self, data):
         """Callback for the current joint position.
+
         :param data: the `JointState <http://docs.ros.org/api/sensor_msgs/html/msg/JointState.html>`_current"""
         self.__position_joint_current[:] = data.position
         self.__velocity_joint_current[:] = data.velocity
@@ -184,11 +201,13 @@ class robot:
 
     def __position_cartesian_current_callback(self, data):
         """Callback for the current cartesian position.
+
         :param data: The cartesian position current."""
         self.__position_cartesian_current = posemath.fromMsg(data)
 
-    def __dvrk_set_state(self, state, timeout = 10):
+    def __dvrk_set_state(self, state, timeout = 5):
         """Simple set state with block.
+
         :param state: the robot state
         :param timeout: the lenghth you want to wait for robot to change state
         :return: whether or not the robot state has been successfuly set
@@ -233,50 +252,56 @@ class robot:
 
     def get_current_cartesian_position(self):
         """Gets the :ref:`current cartesian position <currentvdesired>` of the robot in terms of cartesian space.
+
         :returns: the current position of the robot in cartesian space
-        :rtype: tfx.canonical.CanonicalTransform object"""
-        current_Frame = self.__position_cartesian_current
-        return self.__frame_to_tfxPose(current_Frame)
+        :rtype: `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_"""
+        return self.__position_cartesian_current
 
     def get_current_joint_position(self):
         """Gets the :ref:`current joint position <currentvdesired>` of the robot in terms of joint space.
+
         :returns: the current position of the robot in joint space
         :rtype: `JointState <http://docs.ros.org/api/sensor_msgs/html/msg/JointState.html>`_"""
         return self.__position_joint_current
 
     def get_current_joint_velocity(self):
         """Gets the :ref:`current joint velocity <currentvdesired>` of the robot in terms of joint space.
+
         :returns: the current position of the robot in joint space
         :rtype: `JointState <http://docs.ros.org/api/sensor_msgs/html/msg/JointState.html>`_"""
         return self.__velocity_joint_current
 
     def get_current_joint_effort(self):
         """Gets the :ref:`current joint effort <currentvdesired>` of the robot in terms of joint space.
+
         :returns: the current position of the robot in joint space
         :rtype: `JointState <http://docs.ros.org/api/sensor_msgs/html/msg/JointState.html>`_"""
         return self.__effort_joint_current
 
     def get_desired_cartesian_position(self):
         """Get the :ref:`desired cartesian position <currentvdesired>` of the robot in terms of caretsian space.
+
         :returns: the desired position of the robot in cartesian space
-        :rtype: tfx.canonical.CanonicalTransform object"""
-        desired_Frame = self.__position_cartesian_desired
-        return self.__frame_to_tfxPose(desired_Frame)
+        :rtype: `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_"""
+        return self.__position_cartesian_desired
 
     def get_desired_joint_position(self):
         """Gets the :ref:`desired joint position <currentvdesired>` of the robot in terms of joint space.
+
         :returns: the desired position of the robot in joint space
         :rtype: `JointState <http://docs.ros.org/api/sensor_msgs/html/msg/JointState.html>`_"""
         return self.__position_joint_desired
 
     def get_desired_joint_effort(self):
         """Gets the :ref:`desired joint effort <currentvdesired>` of the robot in terms of joint space.
+
         :returns: the desired effort of the robot in joint space
         :rtype: `JointState <http://docs.ros.org/api/sensor_msgs/html/msg/JointState.html>`_"""
         return self.__effort_joint_desired
 
     def get_joint_number(self):
         """Gets the number of joints on the arm specified.
+
         :returns: the number of joints on the specified arm
         :rtype: int"""
         joint_num = len(self.__position_joint_desired)
@@ -284,14 +309,19 @@ class robot:
 
     def __get_time_interval(self, interval, speed):
         """ Gets the time interval in between interpolations 
+
         :returns: the time interval in between 2 consecutive poses
         :rtype: float """
         if type(speed) == float:
             # Linear interpolation with uniform speed
             return float(interval) /speed
+        elif type(speed) == list:
+            # Cubic interpolation with uniform speed
+            return 0.1              # Note that we have to replace this portion with a valid function 
 
     def __check_input_type(self, input, type_list):
         """check if the data input is a data type that is located in type_list
+
         :param input: The data type that needs to be checked.
         :param type_list : A list of types to check input against.
         :returns: whether or not the input is a type in type_list
@@ -339,6 +369,7 @@ class robot:
 
     def __check_list_length(self, check_list, check_length):
         """check that the list is of desired length
+
         :param list: the list you want to check
         :param check_length: the integer to check it against
         :returns: whether or not the length of check_list is equal to check_length
@@ -360,20 +391,17 @@ class robot:
         "Close the arm gripper"
         if (not self.__dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')):
             return False
-        self.__goal_reached_event.clear()
-        self.__goal_reached = False
         self.set_jaw_position.publish(-10.0 * math.pi / 180.0);
-        self.__goal_reached_event.wait(20) # 1 minute at most
-        if not self.__goal_reached: print 'Jaw not fully closed'
 
-    def open_gripper(self, degree):
+    def open_gripper(self):
         "Open the arm gripper"
         if (not self.__dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')):
             return False
-        self.set_jaw_position.publish(degree * math.pi / 180.0);
+        self.set_jaw_position.publish(80.0 * math.pi / 180.0);
 
     def delta_move_cartesian(self, delta_input, interpolate=True):
         """Incremental translation in cartesian space.
+
         :param delta_input: the incremental translation you want to make
         :param interpolate: see  :ref:`interpolate <interpolate>`
         """
@@ -390,6 +418,7 @@ class robot:
 
     def delta_move_cartesian_translation(self, delta_translation, interpolate=True):
         """Incremental translation in cartesian space.
+
         :param delta_translation: the incremental translation you want to make based on the current position, this is in terms of a  `PyKDL.Vector <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_ or a list of floats of size 3
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian translation')
@@ -412,6 +441,7 @@ class robot:
 
     def delta_move_cartesian_rotation(self, delta_rotation, interpolate=True):
         """Incremental rotation in cartesian plane.
+
         :param delta_rotation: the incremental `PyKDL.Rotation <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_ based upon the current position
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian rotation')
@@ -426,6 +456,7 @@ class robot:
 
     def delta_move_cartesian_frame(self, delta_frame, interpolate=True):
         """Incremental move by Frame in cartesian plane.
+
         :param delta_frame: the incremental `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_ based upon the current position
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting delta move cartesian frame')
@@ -440,6 +471,7 @@ class robot:
 
     def move_cartesian_translation(self, abs_translation, interpolate=True):
         """Absolute translation in cartesian space.
+
         :param abs_translation: the absolute translation you want to make, this is in terms of a  `PyKDL.Vector <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_ or a list of floats of size 3
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian translation')
@@ -463,21 +495,23 @@ class robot:
 
     def move_cartesian(self, abs_input, interpolate=True):
         """Absolute translation in cartesian space.
+
         :param abs_input: the absolute translation you want to make
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian translation')
         # is this a legal translation input
-        if(self.__check_input_type(abs_input, [list, float, Vector, Rotation, Frame, tfx.canonical.CanonicalTransform])):
+        if(self.__check_input_type(abs_input, [list, float, Vector, Rotation, Frame])):
                if(self.__check_input_type(abs_input, [list, float, Vector])):
                    self.move_cartesian_translation(abs_input, interpolate)
                elif(self.__check_input_type(abs_input, [Rotation])):
                    self.move_cartesian_rotation(abs_input, interpolate)
-               elif(self.__check_input_type(abs_input, [Frame, tfx.canonical.CanonicalTransform])):
+               elif(self.__check_input_type(abs_input, [Frame])):
                    self.move_cartesian_frame(abs_input, interpolate)
         rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian translation')
 
     def move_cartesian_rotation(self, abs_rotation, interpolate=True):
         """Absolute rotation in cartesian plane.
+
         :param abs_rotation: the absolute `PyKDL.Rotation <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian rotation')
@@ -490,68 +524,80 @@ class robot:
             self.move_cartesian_frame(abs_frame, interpolate)
             rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian rotation')
 
-    # DONE: Aceept only tfx poses as input 
     def move_cartesian_frame(self, abs_frame, interpolate=True):
         """Absolute move by Frame in cartesian plane.
-        :param abs_frame: abs_frame as a tfx.canonical.CanonicalTransform
+
+        :param abs_frame: the absolute `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian frame')
-
-        # Checks for abs_frame as a tfx pose
-        if not isinstance(abs_frame, tfx.canonical.CanonicalTransform):
-            raise Exception("abs_frame must be a tfx.canonical.CanonicalTransform object")
+        if (self.__check_input_type(abs_frame, [Frame])):
             # move based on value of interpolate
-        if (interpolate):
-            self.__move_cartesian_goal(abs_frame)
-        else:
-            self.__move_cartesian_direct(abs_frame)
-        rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian frame')
+            if (interpolate):
+                self.__move_cartesian_goal(abs_frame)
+            else:
+                self.__move_cartesian_direct(abs_frame)
+            rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian frame')
 
-    # DONE: just put __move_cartesian_SLERP code inside this method + update doc string
-    def move_cartesian_frame_linear_interpolation(self, abs_frame, speed):
-        """ Linear interpolation of frame using SLERP. We use the SLERP function under the tfx class.
-            This is a wrapper function that calls on move_cartesian_frame with interpolate = False
-            :param abs_frame: A tfx.canonical.CanonicalTransform class 
-            :param Speed: Should be a (float) type -> Implements linear slerp interpolation 
-        """
+    def move_cartesian_frame_linear_interpolation(self, abs_frame, speed, cubInterpolate = False):
+        """ Linear interpolation of frame using SLERP.
+            abs_frame as a list of [X Y Z Roll Pitch Yaw]
+            If cubInterpolate = True -> Speed should be (list) [vLow vHigh] -> Implements cubic slerp interpolation 
+            If cubInterpolate = False -> Speed should be (float) speed -> Implements linear slerp interpolation
 
-        if not isinstance(abs_frame, tfx.canonical.CanonicalTransform):
-            raise Exception("Type error: abs_frame should be a tfx.canonical.CanonicalTransform object")
-        elif not speed > 0:
-            raise Exception("Speed should be positive")
+        :param abs_frame: the absolute `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
+        :param interpolate: see  :ref:`interpolate <interpolate>`"""
 
-        interval = 0.0001   # 1 step per X m of distance
-        start_vect = self.get_current_cartesian_position()
-        end_vect = abs_frame
-        displacement = np.array(end_vect.position - start_vect.position)    # Displacement vector     
-        tinterval = max(int(np.linalg.norm(displacement)/ interval), 50)    # Total interval present between start and end poses
-        # DONE: use i not ii
-        for i in range(tinterval):
-            mid_pose = start_vect.interpolate(end_vect, (i +1.0)/ tinterval)   # SLERP interpolation from tfx function
-            # print mid_pose
-            self.move_cartesian_frame(mid_pose, interpolate=False)
+        rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move cartesian SLERP')
+        if (self.__check_input_type(abs_frame, [list,float])):
+            # Checks for abs_frame as list type
+            if (cubInterpolate):
+                if (self.__check_input_type(speed, [list,float])): 
+                    if (type(speed) == list and len(speed) == 2):
+                        pass
+                    else:
+                        print "Error in ", inspect.stack()[1][3], " speed should be a list of [vlow vhigh]" 
+                        return False
+                else:
+                    return False
+            else:
+                if (not self.__check_input_type(speed, [int,float])):
+                    return False
+
+            self.__move_cartesian_SLERP(abs_frame, speed)
+            rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian SLERP')
+
+    def __move_cartesian_SLERP(self, abs_frame, speed):
+        """ To implement SLERP interpolation from current position to specified position"""
+        interval = 0.0001        # 1 step per X m of distance
+        startFrame = self.get_current_cartesian_position()
+        startRPY = list(startFrame.M.GetRPY()); startVect = list(startFrame.p);
+        start_pose = startVect + startRPY
+
+        endVect = np.array([abs_frame[0], abs_frame[1], abs_frame[2]])     # Array of [X Y Z]
+        displacement = endVect - np.array(startVect)                       # Displacement vector
+        Tinterval = int(np.linalg.norm(displacement) /interval)               # Total interval present between start and end poses
+
+        for ii in range(Tinterval):
+            track = linear_pose_interp(start_pose, abs_frame, (ii +1.0)/Tinterval)
+            lin = track['lin'];     quat = track['rot'];     # In the form [w x y z]
+            vect = Vector(lin[0], lin[1], lin[2])
+            rot = Rotation.Quaternion(quat[1], quat[2], quat[3], quat[0])  # function accepts the form (x, y, z, w)
+            frame = Frame(rot, vect)
+            self.move_cartesian_frame(frame, interpolate = False)
+
             Tval = self.__get_time_interval(interval, speed)
             time.sleep(Tval)
-        
-        rospy.loginfo(rospy.get_caller_id() + ' -> completing absolute move cartesian SLERP')
-
-    #DONE: Remove
-    def __frame_to_tfxPose(self, frame):
-        """ Function converts a PyKDL Frame object to a tfx object """
-        """ We convert a PyKDL.Frame object to a ROS posemath object and then reconvert it to a tfx.canonical.CanonicalTransform object """
-
-        """:returns: tfx pose """
-        rosMsg = posemath.toMsg(frame)
-        return tfx.pose(rosMsg) 
+        return 
 
     def __move_cartesian_direct(self, end_frame):
         """Move the robot to the end position by passing the trajectory generator.
+
         :param end_frame: the ending `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
         :returns: true if you had successfully move
         :rtype: Bool"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting move cartesian direct')
         # set in position cartesian mode
-        end_position = end_frame.msg.Pose()
+        end_position = posemath.toMsg(end_frame)
         if (not self.__dvrk_set_state('DVRK_POSITION_CARTESIAN')):
             return False
         # go to that position directly
@@ -561,12 +607,13 @@ class robot:
 
     def __move_cartesian_goal(self, end_frame):
         """Move the robot to the end position by providing a goal for trajectory generator.
+
         :param end_frame: the ending `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
         :returns: true if you had succesfully move
         :rtype: Bool"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting move cartesian goal')
         # set in position cartesian mode
-        end_position = end_frame.msg.Pose()
+        end_position= posemath.toMsg(end_frame)
         if (not self.__dvrk_set_state('DVRK_POSITION_GOAL_CARTESIAN')):
             return False
         # go to that position by goal
@@ -574,6 +621,7 @@ class robot:
 
     def __set_position_goal_cartesian_publish_and_wait(self, end_position):
         """Wrapper around publisher/subscriber to manage events for cartesian coordinates.
+
         :param end_position: the ending `PyKDL.Frame <http://docs.ros.org/diamondback/api/kdl/html/python/geometric_primitives.html>`_
         :returns: returns true if the goal is reached
         :rtype: Bool"""
@@ -590,6 +638,7 @@ class robot:
 
     def delta_move_joint_list(self, value, index=[], interpolate=True):
         """Incremental index move in joint space.
+
         :param value: the incremental amount in which you want to move index by, this is a list
         :param index: the joint you want to move, this is a list
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
@@ -621,15 +670,14 @@ class robot:
 
     def move_joint_list(self, value, index = [], interpolate=True):
         """Absolute index move in joint space.
+
         :param value: the incremental amount in which you want to move index by, this is a list
         :param index: the incremental joint you want to move, this is a list
         :param interpolate: see  :ref:`interpolate <interpolate>`"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting abs move joint index')
         # check if value is a list
         if(self.__check_input_type(value, [list,float])):
-            # while(len(self.get_current_joint_position()) == 0):
-            #     pass
-            initial_joint_position = [i for i in range(7)]      # TODO: Something better than this
+            initial_joint_position = self.__position_joint_desired
             abs_joint = []
             abs_joint[:] = initial_joint_position
             # give index is not given and the size of the value is 7
@@ -649,6 +697,7 @@ class robot:
 
     def __move_joint(self, abs_joint, interpolate = True):
         """Absolute move by vector in joint plane.
+
         :param abs_joint: the absolute position of the joints in terms of a list
         :param interpolate: if false the trajectory generator will be used; if true you can bypass the trajectory generator"""
         rospy.loginfo(rospy.get_caller_id() + ' -> starting absolute move joint vector')
@@ -661,6 +710,7 @@ class robot:
 
     def __move_joint_direct(self, end_joint):
         """Move the robot to the end vector by passing the trajectory generator.
+
         :param end_joint: the list of joints in which you should conclude movement
         :returns: true if you had succesfully move
         :rtype: Bool"""
@@ -677,6 +727,7 @@ class robot:
 
     def __move_joint_goal(self, end_joint):
         """Move the robot to the end vector by bypassing the trajectory generator.
+
         :param end_joint: the list of joints in which you should conclude movement
         :returns: true if you had succesfully move
         :rtype: Bool"""
@@ -691,6 +742,7 @@ class robot:
 
     def __set_position_goal_joint_publish_and_wait(self, end_position):
         """Wrapper around publisher/subscriber to manage events for joint coordinates.
+
         :param end_position: there is only one parameter, end_position which tells us what the ending position is
         :returns: whether or not you have successfully moved by goal or not
         :rtype: Bool"""

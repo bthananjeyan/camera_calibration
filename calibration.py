@@ -32,6 +32,7 @@ def callback_PSM1_actual(data):
     global psm1_pose
     position = data.position
     psm1_pose = [position.x, position.y, position.z]
+    print psm1_pose
     sub.unregister()
     f = open("calibration_data/psm1_calibration.p", "a")
     pickle.dump(psm1_pose, f)
