@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     pt = np.ones((4, 1))
     for i in range(3):
-        pt[i, 0] = camera_points[14, i]
+        pt[i, 0] = camera_points[15, i]
     pt = mat.reshape(3, 4) * pt
     move_to(pt)
 
