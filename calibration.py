@@ -1,59 +1,45 @@
-import cv2
+import dvrk
 import Tkinter
 from Tkinter import *
-import rospy, pickle, time
-from geometry_msgs.msg import Pose
-import multiprocessing
-import numpy as np
+import pickle
 import sys
-from sklearn.decomposition import PCA
+
+arm1 = dvrk.psm("PSM1")
+arm2 = dvrk.psm("PSM2")
+get_arm_pos = lambda arm: arm.get_current_position().p
 
 
-def startCallback():
-    global prs
-    process = multiprocessing.Process(target = start_listening)
-    prs.append(process)
-    process.start()
-    return
-
-def start_listening():
-    global sub
-    rospy.init_node('listener', anonymous=True)
-    sub = rospy.Subscriber('/dvrk/PSM1/position_cartesian_current', Pose, callback_PSM1_actual)
-    rospy.spin()
-
-def exitCallback():
-    global prs
-    for process in prs:
-        process.terminate()
+def exit_callback():
     sys.exit()
 
-def callback_PSM1_actual(data):
-    global psm1_pose
-    position = data.position
-    psm1_pose = [position.x, position.y, position.z]
-    print psm1_pose
-    sub.unregister()
+def record_PSM1_location():
+    psm_pose = get_arm_pos(arm1)
+    print psm_pose
     f = open("calibration_data/psm1_calibration.p", "a")
-    pickle.dump(psm1_pose, f)
+    pickle.dump(psm_pose, f)
+    f.close()
+
+def record_PSM2_location():
+    psm_pose = get_arm_pos(arm2)
+    print psm_pose
+    f = open("calibration_data/psm2_calibration.p", "a")
+    pickle.dump(psm_pose, f)
     f.close()
 
 if __name__ == '__main__':
-    sub = None
-    prs = []
-    psm1_pose = None
-    points = []
-
     open('calibration_data/psm1_calibration.p', 'w+').close()
+    open('calibration_data/psm2_calibration.p', 'w+').close()
 
     top = Tkinter.Tk()
     top.title('Calibration')
     top.geometry('400x200')
 
-    B = Tkinter.Button(top, text="Record Position", command = startCallback)
-    D = Tkinter.Button(top, text="Exit", command = exitCallback)
+    B1 = Tkinter.Button(top, text="Record Position (Right)", command = record_PSM1_location)
+    B2 = Tkinter.Button(top, text="Record Position (Left)", command = record_PSM2_location)
+    D = Tkinter.Button(top, text="Exit", command = exit_callback)
 
-    B.pack()
+    B1.pack()
+    B2.pack()
     D.pack()
 
     top.mainloop()
